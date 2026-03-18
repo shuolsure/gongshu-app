@@ -8,12 +8,17 @@ export async function GET(request: NextRequest) {
   const state = searchParams.get('state');
   const error = searchParams.get('error');
 
+  // 获取正确的域名
+  const host = request.headers.get('host') || 'gongshu-app.vercel.app';
+  const protocol = request.headers.get('x-forwarded-proto') || 'https';
+  const baseUrl = `${protocol}://${host}`;
+
   if (error) {
-    return NextResponse.redirect(new URL('/?error=' + error, request.url));
+    return NextResponse.redirect(new URL('/?error=' + error, baseUrl));
   }
 
   if (!code) {
-    return NextResponse.redirect(new URL('/?error=no_code', request.url));
+    return NextResponse.redirect(new URL('/?error=no_code', baseUrl));
   }
 
   // Verify state (with fallback for WebView scenarios)
@@ -26,7 +31,8 @@ export async function GET(request: NextRequest) {
     // Exchange code for token
     const tokenResult = await exchangeCodeForToken(code);
     if (tokenResult.code !== 0) {
-      return NextResponse.redirect(new URL('/?error=token_exchange_failed', request.url));
+      console.error('Token exchange failed:', tokenResult);
+      return NextResponse.redirect(new URL('/?error=token_exchange_failed', baseUrl));
     }
 
     const { access_token, refresh_token, expires_in } = tokenResult.data;
@@ -34,7 +40,8 @@ export async function GET(request: NextRequest) {
     // Get user info
     const userResult = await getUserInfo(access_token);
     if (userResult.code !== 0) {
-      return NextResponse.redirect(new URL('/?error=user_info_failed', request.url));
+      console.error('Get user info failed:', userResult);
+      return NextResponse.redirect(new URL('/?error=user_info_failed', baseUrl));
     }
 
     const { userId, name, avatar } = userResult.data;
@@ -60,19 +67,22 @@ export async function GET(request: NextRequest) {
     });
 
     // Create response with session cookie
-    const response = NextResponse.redirect(new URL('/', request.url));
+    const response = NextResponse.redirect(new URL('/', baseUrl));
     
+    // 设置 cookie，添加 path 确保整个站点可访问
     response.cookies.set('user_id', user.id, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: true, // Vercel 始终使用 HTTPS
       sameSite: 'lax',
+      path: '/',
       maxAge: 30 * 24 * 60 * 60, // 30 days
     });
 
     response.cookies.set('secondme_user_id', userId, {
       httpOnly: false,
-      secure: process.env.NODE_ENV === 'production',
+      secure: true,
       sameSite: 'lax',
+      path: '/',
       maxAge: 30 * 24 * 60 * 60,
     });
 
@@ -82,6 +92,6 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (err) {
     console.error('OAuth callback error:', err);
-    return NextResponse.redirect(new URL('/?error=auth_failed', request.url));
+    return NextResponse.redirect(new URL('/?error=auth_failed', baseUrl));
   }
 }
