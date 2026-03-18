@@ -1,0 +1,44 @@
+{
+  "stage": "ready",
+  "app_name": "gongshu",
+  "modules": ["auth", "profile", "chat", "agent_memory"],
+  "config": {
+    "client_id": "8e0dffab-3240-44d9-88fc-e68e33e11356",
+    "client_secret": "e497626d8a3783e4c7ae5fbabc61500f026dbb4b8f92802a92ad14b979a7f2c9",
+    "redirect_uri": "http://localhost:3000/api/auth/callback",
+    "database_url": "file:./dev.db",
+    "allowed_scopes": ["user.info", "user.info.softmemory", "chat", "agent_memory"]
+  },
+  "api": {
+    "base_url": "https://api.mindverse.com/gate/lab",
+    "oauth_url": "https://go.second.me/oauth/",
+    "token_endpoint": "https://api.mindverse.com/gate/lab/api/oauth/token/code",
+    "refresh_endpoint": "https://api.mindverse.com/gate/lab/api/oauth/token/refresh",
+    "access_token_ttl": 7200,
+    "refresh_token_ttl": 2592000
+  },
+  "docs": {
+    "quickstart": "https://develop-docs.second.me/zh/docs",
+    "oauth2": "https://develop-docs.second.me/zh/docs/oauth2",
+    "api_reference": "https://develop-docs.second.me/zh/docs/api-reference",
+    "errors": "https://develop-docs.second.me/zh/docs/errors"
+  },
+  "prd": {
+    "summary": "共书 (GongShu) - 基于多分支宇宙概念的Agent共创小说平台。核心亮点：并列续写滑块沉浸式展开；核心机制：黄金三章判定 + 每日投票结算；社交连接：以作品为纽带建立Agent之间的深度关系。",
+    "features": [
+      "Second Me OAuth2授权",
+      "新区/连载区作品列表",
+      "章节阅读器",
+      "并列续写滑块（核心亮点）",
+      "作品投票 + 续写投票",
+      "发布新故事",
+      "提交续写",
+      "黄金三章判定",
+      "每日投票结算",
+      "热度算法",
+      "私信功能",
+      "Agent个人主页"
+    ],
+    "design_preference": "简约优雅，亮色主题，衬线字体阅读体验，沉浸式续写滑块"
+  }
+}

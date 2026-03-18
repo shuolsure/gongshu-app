@@ -1,0 +1,173 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+// 用户模型（结合 Second Me）
+model User {
+  id              String   @id @default(cuid())
+  secondmeUserId  String   @unique @map("secondme_user_id")
+  name            String?
+  avatar          String?
+  accessToken     String   @map("access_token")
+  refreshToken    String   @map("refresh_token")
+  tokenExpiresAt  DateTime @map("token_expires_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // 关联
+  novels          Novel[]
+  chapters        Chapter[]
+  continuations   Continuation[]
+  votes           VoteRecord[]
+  sentMessages    Message[]        @relation("SentMessages")
+  receivedMessages Message[]       @relation("ReceivedMessages")
+  sessions1       DirectMessageSession[] @relation("UserSessions1")
+  sessions2       DirectMessageSession[] @relation("UserSessions2")
+
+  @@map("users")
+}
+
+// 作品
+model Novel {
+  id              String   @id @default(cuid())
+  title           String
+  summary         String?
+  status          String   @default("new") // new | serial
+  chapterCount    Int      @default(1) @map("chapter_count")
+  totalVotes      Int      @default(0) @map("total_votes")
+  contributorCount Int     @default(1) @map("contributor_count")
+  coverImage      String?  @map("cover_image")
+  hotScore        Float    @default(0) @map("hot_score") // 热度分数
+  lastUpdateAt    DateTime @default(now()) @map("last_update_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  authorId        String   @map("author_id")
+
+  // 关联
+  author          User     @relation(fields: [authorId], references: [id])
+  chapters        Chapter[]
+  continuations   Continuation[]
+  contributors    NovelContributor[]
+
+  @@map("novels")
+}
+
+// 正文章节
+model Chapter {
+  id            String   @id @default(cuid())
+  novelId       String   @map("novel_id")
+  chapterNumber Int      @map("chapter_number")
+  title         String
+  content       String
+  authorId      String   @map("author_id")
+  author        String
+  votes         Int      @default(0)
+  likes         Int      @default(0)
+  dislikes      Int      @default(0)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  // 关联
+  novel         Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  authorUser    User     @relation(fields: [authorId], references: [id])
+  continuations Continuation[]
+
+  @@unique([novelId, chapterNumber])
+  @@map("chapters")
+}
+
+// 并列续写
+model Continuation {
+  id                  String   @id @default(cuid())
+  novelId             String   @map("novel_id")
+  afterChapterNumber  Int      @map("after_chapter_number")
+  content             String
+  wordCount           Int      @map("word_count")
+  authorId            String   @map("author_id")
+  author              String
+  votes               Int      @default(0)
+  likes               Int      @default(0)
+  dislikes            Int      @default(0)
+  isSettled           Boolean  @default(false) @map("is_settled")
+  isWinner            Boolean  @default(false) @map("is_winner")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  // 关联
+  novel               Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  chapter             Chapter? @relation(fields: [afterChapterNumber, novelId], references: [chapterNumber, novelId], onDelete: Cascade)
+  authorUser          User     @relation(fields: [authorId], references: [id])
+
+  @@map("continuations")
+}
+
+// 投票记录
+model VoteRecord {
+  id          String   @id @default(cuid())
+  voterId     String   @map("voter_id")
+  targetType  String   // novel | chapter | continuation
+  targetId    String   @map("target_id")
+  voteType    String   // like | dislike
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // 关联
+  voter       User     @relation(fields: [voterId], references: [id])
+
+  @@unique([voterId, targetType, targetId])
+  @@map("vote_records")
+}
+
+// 作品-贡献者关联
+model NovelContributor {
+  novelId       String   @map("novel_id")
+  contributorId String   @map("contributor_id")
+  role          String   @default("creator") // creator | co_author
+  joinedAt      DateTime @default(now()) @map("joined_at")
+
+  // 关联
+  novel         Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+
+  @@id([novelId, contributorId])
+  @@map("novel_contributors")
+}
+
+// 私信会话
+model DirectMessageSession {
+  id              String   @id @default(cuid())
+  participant1Id  String   @map("participant1_id")
+  participant2Id  String   @map("participant2_id")
+  lastMessage     String?  @map("last_message")
+  lastMessageAt   DateTime? @map("last_message_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  // 关联
+  participant1    User     @relation("UserSessions1", fields: [participant1Id], references: [id])
+  participant2    User     @relation("UserSessions2", fields: [participant2Id], references: [id])
+  messages        Message[]
+
+  @@unique([participant1Id, participant2Id])
+  @@map("direct_message_sessions")
+}
+
+// 私信消息
+model Message {
+  id          String   @id @default(cuid())
+  sessionId   String   @map("session_id")
+  senderId    String   @map("sender_id")
+  receiverId  String   @map("receiver_id")
+  content     String
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // 关联
+  session     DirectMessageSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sender      User     @relation("SentMessages", fields: [senderId], references: [id])
+  receiver    User     @relation("ReceivedMessages", fields: [receiverId], references: [id])
+
+  @@map("messages")
+}
