@@ -13,11 +13,18 @@ export async function GET(request: NextRequest) {
   const protocol = request.headers.get('x-forwarded-proto') || 'https';
   const baseUrl = `${protocol}://${host}`;
 
+  console.log('OAuth callback received');
+  console.log('Host:', host);
+  console.log('Code:', code?.substring(0, 20) + '...');
+  console.log('Error:', error);
+
   if (error) {
+    console.error('OAuth error:', error);
     return NextResponse.redirect(new URL('/?error=' + error, baseUrl));
   }
 
   if (!code) {
+    console.error('No code received');
     return NextResponse.redirect(new URL('/?error=no_code', baseUrl));
   }
 
@@ -30,29 +37,31 @@ export async function GET(request: NextRequest) {
   try {
     // Exchange code for token
     const tokenResult = await exchangeCodeForToken(code);
-    if (tokenResult.code !== 0) {
-      console.error('Token exchange failed:', tokenResult);
+    if (tokenResult.code !== 0 || !tokenResult.data) {
+      console.error('Token exchange failed:', JSON.stringify(tokenResult));
       return NextResponse.redirect(new URL('/?error=token_exchange_failed', baseUrl));
     }
 
-    const { access_token, refresh_token, expires_in } = tokenResult.data;
+    const { accessToken, refreshToken, expiresIn } = tokenResult.data;
+    console.log('Token exchange successful, expires in:', expiresIn);
 
     // Get user info
-    const userResult = await getUserInfo(access_token);
-    if (userResult.code !== 0) {
-      console.error('Get user info failed:', userResult);
+    const userResult = await getUserInfo(accessToken);
+    if (userResult.code !== 0 || !userResult.data) {
+      console.error('Get user info failed:', JSON.stringify(userResult));
       return NextResponse.redirect(new URL('/?error=user_info_failed', baseUrl));
     }
 
     const { userId, name, avatar } = userResult.data;
+    console.log('User info retrieved:', userId, name);
 
     // Create or update user in database
     const user = await prisma.user.upsert({
       where: { secondmeUserId: userId },
       update: {
-        accessToken: access_token,
-        refreshToken: refresh_token,
-        tokenExpiresAt: new Date(Date.now() + expires_in * 1000),
+        accessToken: accessToken,
+        refreshToken: refreshToken,
+        tokenExpiresAt: new Date(Date.now() + expiresIn * 1000),
         name: name || null,
         avatar: avatar || null,
       },
@@ -60,11 +69,13 @@ export async function GET(request: NextRequest) {
         secondmeUserId: userId,
         name: name || null,
         avatar: avatar || null,
-        accessToken: access_token,
-        refreshToken: refresh_token,
-        tokenExpiresAt: new Date(Date.now() + expires_in * 1000),
+        accessToken: accessToken,
+        refreshToken: refreshToken,
+        tokenExpiresAt: new Date(Date.now() + expiresIn * 1000),
       },
     });
+
+    console.log('User saved to database:', user.id);
 
     // Create response with session cookie
     const response = NextResponse.redirect(new URL('/', baseUrl));
@@ -89,6 +100,7 @@ export async function GET(request: NextRequest) {
     // Clear oauth_state cookie
     response.cookies.delete('oauth_state');
 
+    console.log('Login successful, cookies set');
     return response;
   } catch (err) {
     console.error('OAuth callback error:', err);
